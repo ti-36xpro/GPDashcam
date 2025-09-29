@@ -18,8 +18,9 @@ static const char *TAG = "i2c-tools";
 
 static gpio_num_t i2c_gpio_sda = CONFIG_EXAMPLE_I2C_MASTER_SDA;
 static gpio_num_t i2c_gpio_scl = CONFIG_EXAMPLE_I2C_MASTER_SCL;
-
 static i2c_port_t i2c_port = I2C_NUM_0;
+static uint8_t *data_byte; 
+static int16_t raw_x; 
 
 #if CONFIG_EXAMPLE_STORE_HISTORY
 
@@ -75,20 +76,24 @@ void app_main(void)
 
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &tool_bus_handle));
 
-    register_i2ctools();
-
-    printf("\n ==============================================================\n");
-    printf(" |             Steps to Use i2c-tools                         |\n");
-    printf(" |                                                            |\n");
-    printf(" |  1. Try 'help', check all supported commands               |\n");
-    printf(" |  2. Try 'i2cconfig' to configure your I2C bus              |\n");
-    printf(" |  3. Try 'i2cdetect' to scan devices on the bus             |\n");
-    printf(" |  4. Try 'i2cget' to get the content of specific register   |\n");
-    printf(" |  5. Try 'i2cset' to set the value of specific register     |\n");
-    printf(" |  6. Try 'i2cdump' to dump all the register (Experiment)    |\n");
-    printf(" |                                                            |\n");
-    printf(" ==============================================================\n\n");
-
     // start console REPL
     ESP_ERROR_CHECK(esp_console_start_repl(repl));
+
+	data_byte = malloc(1); 
+	i2cget(0x53, 0x32, data_byte);
+	i2cset(0x53, 0x2d, 0x00);
+	i2cset(0x53, 0x2d, 0x08);
+	i2cset(0x53, 0x31, 0x01);
+
+	i2cget(0x53, 0x32, data_byte);
+	printf("\n0x32: 0x%x\n",*data_byte); 
+	raw_x = *data_byte; 
+
+	i2cget(0x53, 0x33, data_byte);
+	printf("\n0x33: 0x%x\n",*data_byte); 
+	raw_x = raw_x | *data_byte << 8; 
+
+	printf("\nx-axis: %f\n", (float)raw_x/128); 
+
+	free(data_byte); 
 }
