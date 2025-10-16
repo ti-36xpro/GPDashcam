@@ -19,10 +19,10 @@ static const char *TAG = "i2ctools";
 #define I2C_TOOL_TIMEOUT_VALUE_MS (50)
 i2c_master_bus_handle_t i2c_master_bus_handle;
 
-uint8_t i2cget(i2c_master_dev_handle_t i2c_dev_handle, uint8_t data_addr, uint8_t *data) {
+uint8_t i2cget(i2c_master_dev_handle_t *i2c_dev_handle, uint8_t data_addr, uint8_t *data) {
     uint8_t len = 1;
 
-    esp_err_t ret = i2c_master_transmit_receive(i2c_dev_handle, (uint8_t*)&data_addr, 1, data, len, I2C_TOOL_TIMEOUT_VALUE_MS);
+    esp_err_t ret = i2c_master_transmit_receive(*i2c_dev_handle, (uint8_t*)&data_addr, 1, data, len, I2C_TOOL_TIMEOUT_VALUE_MS);
     if (ret == ESP_OK) {
     } else if (ret == ESP_ERR_TIMEOUT) {
         ESP_LOGW(TAG, "Bus is busy");
@@ -34,13 +34,13 @@ uint8_t i2cget(i2c_master_dev_handle_t i2c_dev_handle, uint8_t data_addr, uint8_
     return 0;
 }
 
-uint8_t i2cset(i2c_master_dev_handle_t i2c_dev_handle, uint8_t data_addr, uint8_t data) {
+uint8_t i2cset(i2c_master_dev_handle_t *i2c_dev_handle, uint8_t data_addr, uint8_t data) {
     int len = 1;
 
     uint8_t *register_data = malloc(len + 1);
     register_data[0] = data_addr;
 	register_data[1] = data;
-    esp_err_t ret = i2c_master_transmit(i2c_dev_handle, register_data, len + 1, I2C_TOOL_TIMEOUT_VALUE_MS);
+    esp_err_t ret = i2c_master_transmit(*i2c_dev_handle, register_data, len + 1, I2C_TOOL_TIMEOUT_VALUE_MS);
     if (ret == ESP_OK) {
 		ESP_LOGI(TAG, "Write OK");
 	} else if (ret == ESP_ERR_TIMEOUT) {

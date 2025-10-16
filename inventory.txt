@@ -1,0 +1,15 @@
+2x esp 
+	2x boards 
+	2x usb-a to usb-c cables 
+	2x 1GB microSD card 
+	2x usb-a microSD card readers 
+	2x ov3660 cameras 
+2x ov5640 cam 
+	2x cam
+	2x lens cover 
+2x display 
+2x accelerometer 
+	MF jumper wires 
+2x gps 
+	2x gps module 
+	2x antenna

@@ -5,8 +5,10 @@
  */
 
 #include <stdio.h>
-#include "cmd_i2ctools.h"
+#include "i2c_tools.h"
 #include "driver/i2c_master.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define I2C_FREQUENCY 100000
 #define I2C_ACCEL_ADDR 0x53
@@ -15,8 +17,6 @@
 static gpio_num_t i2c_gpio_sda = CONFIG_EXAMPLE_I2C_MASTER_SDA;
 static gpio_num_t i2c_gpio_scl = CONFIG_EXAMPLE_I2C_MASTER_SCL;
 static i2c_port_t i2c_port = I2C_NUM_0;
-static uint8_t *data_byte; 
-static int16_t raw_x; 
 
 
 
@@ -36,33 +36,46 @@ void app_main(void) {
         .scl_speed_hz = I2C_FREQUENCY,
         .device_address = I2C_ACCEL_ADDR,
     };
-    i2c_master_dev_handle_t i2c_accel_handle;
-    if (i2c_master_bus_add_device(i2c_master_bus_handle, &i2c_accel_conf, &i2c_accel_handle) != ESP_OK) {
+    i2c_master_dev_handle_t *i2c_accel_handle = malloc(sizeof(i2c_master_dev_handle_t));
+    if (i2c_master_bus_add_device(i2c_master_bus_handle, &i2c_accel_conf, i2c_accel_handle) != ESP_OK) {
         return;
     }
 
+	int16_t raw_x; 
+	int16_t raw_y; 
+	int16_t raw_z; 
 
-
-	data_byte = malloc(1); 
+	uint8_t* data_byte = malloc(sizeof(uint8_t)); 
 	i2cget(i2c_accel_handle, 0x32, data_byte);
 	i2cset(i2c_accel_handle, 0x2d, 0x00);
 	i2cset(i2c_accel_handle, 0x2d, 0x08);
 	i2cset(i2c_accel_handle, 0x31, 0x01);
 
-	i2cget(i2c_accel_handle, 0x32, data_byte);
-	printf("\n0x32: 0x%x\n",*data_byte); 
-	raw_x = *data_byte; 
+	while (1) { 
+		i2cget(i2c_accel_handle, 0x32, data_byte);
+		raw_x = *data_byte; 
+		i2cget(i2c_accel_handle, 0x33, data_byte);
+		raw_x = raw_x | *data_byte << 8; 
+		i2cget(i2c_accel_handle, 0x34, data_byte);
+		raw_y = *data_byte; 
+		i2cget(i2c_accel_handle, 0x35, data_byte);
+		raw_y = raw_y | *data_byte << 8; 
+		i2cget(i2c_accel_handle, 0x36, data_byte);
+		raw_z = *data_byte; 
+		i2cget(i2c_accel_handle, 0x37, data_byte);
+		raw_z = raw_z | *data_byte << 8; 
 
-	i2cget(i2c_accel_handle, 0x33, data_byte);
-	printf("\n0x33: 0x%x\n",*data_byte); 
-	raw_x = raw_x | *data_byte << 8; 
+		printf("\nx-axis: %.2f", (float)raw_x/128); 
+		printf("\ny-axis: %.2f", (float)raw_y/128); 
+		printf("\nz-axis: %.2f\n", (float)raw_z/128); 
+		vTaskDelay(pdMS_TO_TICKS(500));
+	}
 
-	printf("\nx-axis: %f\n", (float)raw_x/128); 
-
-	if (i2c_master_bus_rm_device(i2c_accel_handle) != ESP_OK) {
+	if (i2c_master_bus_rm_device(*i2c_accel_handle) != ESP_OK) {
 		return;
 	}
 	free(data_byte);
+	free(i2c_accel_handle); 
 }
 
 
