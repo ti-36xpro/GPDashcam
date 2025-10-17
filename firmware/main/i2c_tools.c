@@ -14,7 +14,7 @@
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 
-static const char *TAG = "i2ctools";
+static const char *TAG = "i2c_tools";
 
 #define I2C_TOOL_TIMEOUT_VALUE_MS (50)
 i2c_master_bus_handle_t i2c_master_bus_handle;

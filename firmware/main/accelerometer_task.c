@@ -1,26 +1,15 @@
-/*
- * SPDX-FileCopyrightText: 2022-2024 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <stdio.h>
 #include "i2c_tools.h"
+#include "accelerometer.h"
 #include "driver/i2c_master.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 #define I2C_FREQUENCY 100000
 #define I2C_ACCEL_ADDR 0x53
 
+void accelerometer_task(void *pvParameters) { 
+	static gpio_num_t i2c_gpio_sda = CONFIG_EXAMPLE_I2C_MASTER_SDA;
+	static gpio_num_t i2c_gpio_scl = CONFIG_EXAMPLE_I2C_MASTER_SCL;
+	static i2c_port_t i2c_port = I2C_NUM_0;
 
-static gpio_num_t i2c_gpio_sda = CONFIG_EXAMPLE_I2C_MASTER_SDA;
-static gpio_num_t i2c_gpio_scl = CONFIG_EXAMPLE_I2C_MASTER_SCL;
-static i2c_port_t i2c_port = I2C_NUM_0;
-
-
-
-void app_main(void) {
     i2c_master_bus_config_t i2c_master_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = i2c_port,
@@ -41,12 +30,17 @@ void app_main(void) {
         return;
     }
 
-	int16_t raw_x; 
-	int16_t raw_y; 
-	int16_t raw_z; 
+	static int16_t raw_x; 
+	static int16_t raw_y; 
+	static int16_t raw_z; 
 
 	uint8_t* data_byte = malloc(sizeof(uint8_t)); 
+
+	// TODO: Figure out why I2C device needs to be woken up. 
+	// Current inelegant solution is to poke it with a read. 
 	i2cget(i2c_accel_handle, 0x32, data_byte);
+
+	// Configure accelerometer 
 	i2cset(i2c_accel_handle, 0x2d, 0x00);
 	i2cset(i2c_accel_handle, 0x2d, 0x08);
 	i2cset(i2c_accel_handle, 0x31, 0x01);
@@ -69,13 +63,12 @@ void app_main(void) {
 		printf("\ny-axis: %.2f", (float)raw_y/128); 
 		printf("\nz-axis: %.2f\n", (float)raw_z/128); 
 		vTaskDelay(pdMS_TO_TICKS(500));
+
+		UBaseType_t remaining = uxTaskGetStackHighWaterMark(NULL);
+        printf("Task stack high-water mark: %u words\n", remaining);
 	}
 
-	if (i2c_master_bus_rm_device(*i2c_accel_handle) != ESP_OK) {
-		return;
-	}
-	free(data_byte);
-	free(i2c_accel_handle); 
+	// If the process somehow exits the loop
+	printf("ERROR: accelerometer_task() exited unexpectedly\n"); 
+	i2c_master_bus_rm_device(*i2c_accel_handle);
 }
-
-
