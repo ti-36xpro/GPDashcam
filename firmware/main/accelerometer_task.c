@@ -1,20 +1,23 @@
+#include "freertos/FreeRTOS.h"
 #include "i2c_tools.h"
 #include "accelerometer.h"
 #include "driver/i2c_master.h"
+#include "esp_log.h"
 
 #define I2C_FREQUENCY 100000
 #define I2C_ACCEL_ADDR 0x53
 
 void accelerometer_task(void *pvParameters) { 
-	static gpio_num_t i2c_gpio_sda = CONFIG_EXAMPLE_I2C_MASTER_SDA;
-	static gpio_num_t i2c_gpio_scl = CONFIG_EXAMPLE_I2C_MASTER_SCL;
+	static const char *TASK_TAG = "ACCELEROMETER_TASK";
+	esp_log_level_set(TASK_TAG, ESP_LOG_INFO);
+
 	static i2c_port_t i2c_port = I2C_NUM_0;
 
     i2c_master_bus_config_t i2c_master_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = i2c_port,
-        .scl_io_num = i2c_gpio_scl,
-        .sda_io_num = i2c_gpio_sda,
+        .scl_io_num = CONFIG_SCL_PIN_NUM,
+        .sda_io_num = CONFIG_SDA_PIN_NUM,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
@@ -59,16 +62,9 @@ void accelerometer_task(void *pvParameters) {
 		i2cget(i2c_accel_handle, 0x37, data_byte);
 		raw_z = raw_z | *data_byte << 8; 
 
-		printf("\nx-axis: %.2f", (float)raw_x/128); 
-		printf("\ny-axis: %.2f", (float)raw_y/128); 
-		printf("\nz-axis: %.2f\n", (float)raw_z/128); 
+		ESP_LOGI(TASK_TAG, "x=%.2f, y=%.2f, z=%.2f", (float)raw_x/128, (float)raw_y/128, (float)raw_z/128); 
 		vTaskDelay(pdMS_TO_TICKS(500));
-
-		UBaseType_t remaining = uxTaskGetStackHighWaterMark(NULL);
-        printf("Task stack high-water mark: %u words\n", remaining);
 	}
 
-	// If the process somehow exits the loop
-	printf("ERROR: accelerometer_task() exited unexpectedly\n"); 
 	i2c_master_bus_rm_device(*i2c_accel_handle);
 }

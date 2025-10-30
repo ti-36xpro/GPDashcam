@@ -1,11 +1,3 @@
-/* UART asynchronous example, that uses separate RX and TX tasks
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -14,7 +6,6 @@
 #include "string.h"
 #include "driver/gpio.h"
 
-#define RXD_PIN 21
 #define BAUD_RATE 9600
 #define QUEUE_SIZE 16
 #define RMC_SIZE 13
@@ -146,9 +137,8 @@ static void parse_fields(char *fields[], rmc_statement *gps){
 	}
 }
 
-static void rx_task(void *arg) {
-	static const char *RX_TASK_TAG = "RX_TASK";
-	esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
+void gps_task(void *arg) {
+	static const char *TASK_TAG = "GPS_TASK";
 
 	QueueHandle_t event_queue;
 	// Initalize UART 
@@ -162,7 +152,7 @@ static void rx_task(void *arg) {
     };
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, RX_BUF_SIZE, 0, QUEUE_SIZE, &event_queue, 0));
     uart_param_config(UART_NUM_1, &uart_config);
-    uart_set_pin(UART_NUM_1, UART_PIN_NO_CHANGE, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(UART_NUM_1, UART_PIN_NO_CHANGE, CONFIG_RX_PIN_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 	uart_flush(UART_NUM_1); 
 
 
@@ -172,7 +162,7 @@ static void rx_task(void *arg) {
 	char *sentence_remainder; 
 	uint8_t field_count; 
 
-	ESP_LOGI(RX_TASK_TAG, "Initialized"); 
+	ESP_LOGI(TASK_TAG, "Initialized"); 
 
 	while(1) {
 		uint8_t len = uart_read_bytes(UART_NUM_1, buffer, RX_BUF_SIZE, pdMS_TO_TICKS(100));
@@ -208,9 +198,8 @@ static void rx_task(void *arg) {
 							}
 						}
 
-						/*ESP_LOGI(RX_TASK_TAG, "%s", fields[1]);*/
 						parse_fields(fields, gps); 
-						ESP_LOGI(RX_TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", 
+						ESP_LOGI(TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", 
 							gps->day, 
 							gps->month, 
 							gps->year, 
@@ -223,8 +212,6 @@ static void rx_task(void *arg) {
 							gps->cog,
 							gps->direction
 						); 
-						UBaseType_t remaining = uxTaskGetStackHighWaterMark(NULL);
-						printf("Task stack high-water mark: %u words\n", remaining);
 					}
 					sentence = buffer+i+1; // Shift line read pointer over 
 				}
@@ -234,9 +221,4 @@ static void rx_task(void *arg) {
 	}
     free(buffer);
 	free(gps); 
-}
-
-void app_main(void)
-{
-    xTaskCreate(rx_task, "uart_rx_task", 2500, NULL, configMAX_PRIORITIES - 1, NULL);
 }

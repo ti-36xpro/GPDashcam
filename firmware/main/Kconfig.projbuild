@@ -1,25 +1,21 @@
 menu "Example Configuration"
 
-    config EXAMPLE_STORE_HISTORY
-        bool "Store command history in flash"
-        default y
-        help
-            Linenoise line editing library provides functions to save and load
-            command history. If this option is enabled, initalizes a FAT filesystem
-            and uses it to store command history.
 
-    config EXAMPLE_I2C_MASTER_SCL
-        int "SCL GPIO Num"
-        default 19 if IDF_TARGET_ESP32
-        default 4
+    config RX_PIN_NUM
+        int "RX pin number"
+        default 48
         help
-            GPIO number for I2C Master clock line.
+            GPIO number for UART RX pin
 
-    config EXAMPLE_I2C_MASTER_SDA
-        int "SDA GPIO Num"
-        default 18 if IDF_TARGET_ESP32
-        default 5
+    config SDA_PIN_NUM
+        int "SDA pin number"
+        default 21
         help
-            GPIO number for I2C Master data line.
+			GPIO number for i2c SDA pin
 
+    config SCL_PIN_NUM
+        int "SCL pin number"
+        default 47
+        help
+			GPIO number for i2c SCL pin
 endmenu
