@@ -4,3 +4,4 @@ build/
 *.elf
 *.exe
 *.old
+*sdkconfig
