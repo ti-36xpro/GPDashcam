@@ -140,7 +140,8 @@ static void parse_fields(char *fields[], rmc_statement *gps){
 void gps_task(void *arg) {
 	static const char *TASK_TAG = "GPS_TASK";
 
-	QueueHandle_t event_queue;
+	QueueHandle_t gps_queue = (QueueHandle_t)arg; 
+	QueueHandle_t uart_queue;
 	// Initalize UART 
     const uart_config_t uart_config = {
         .baud_rate = BAUD_RATE,
@@ -150,7 +151,7 @@ void gps_task(void *arg) {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, RX_BUF_SIZE, 0, QUEUE_SIZE, &event_queue, 0));
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, RX_BUF_SIZE, 0, QUEUE_SIZE, &uart_queue, 0));
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, UART_PIN_NO_CHANGE, CONFIG_RX_PIN_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 	uart_flush(UART_NUM_1); 
@@ -199,19 +200,23 @@ void gps_task(void *arg) {
 						}
 
 						parse_fields(fields, gps); 
-						ESP_LOGI(TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", 
-							gps->day, 
-							gps->month, 
-							gps->year, 
-							gps->hour, 
-							gps->minute, 
-							gps->second, 
-							gps->latitude,
-							gps->longitude,
-							gps->speed,
-							gps->cog,
-							gps->direction
-						); 
+						if (xQueueSend(gps_queue, gps, pdMS_TO_TICKS(100)) != pdPASS) {
+							ESP_LOGW(TASK_TAG, "Queue full, dropping GPS data");
+						}
+
+						/*ESP_LOGI(TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", */
+						/*	gps->day, */
+						/*	gps->month, */
+						/*	gps->year, */
+						/*	gps->hour, */
+						/*	gps->minute, */
+						/*	gps->second, */
+						/*	gps->latitude,*/
+						/*	gps->longitude,*/
+						/*	gps->speed,*/
+						/*	gps->cog,*/
+						/*	gps->direction*/
+						/*); */
 					}
 					sentence = buffer+i+1; // Shift line read pointer over 
 				}
