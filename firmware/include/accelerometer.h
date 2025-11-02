@@ -7,6 +7,11 @@
 #define I2C_FREQUENCY 100000
 #define I2C_ACCEL_ADDR 0x53
 
+typedef struct { 
+	QueueHandle_t *accel_queue; 
+	i2c_master_bus_handle_t *i2c_bus;
+} accel_params_t;
+
 /**
  * @brief Struct representing acceleration data in 3 axes (x, y, z).
  */

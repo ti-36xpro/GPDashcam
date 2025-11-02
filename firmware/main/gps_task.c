@@ -130,7 +130,7 @@ static void parse_fields(char *fields[], rmc_statement *gps){
 	// Parse for heading 
 	if(fields[8] && fields[8][0] != '\0') {
 		gps->cog = strtof(fields[8], NULL);
-		gps->direction = (char *)direction_str[degrees_to_compass_direction(gps->cog)]; 
+		gps->direction = direction_str[degrees_to_compass_direction(gps->cog)]; 
 	} else {
 		gps->cog = 0;
 		gps->direction = ""; 
@@ -203,20 +203,22 @@ void gps_task(void *arg) {
 						if (xQueueSend(gps_queue, gps, pdMS_TO_TICKS(100)) != pdPASS) {
 							ESP_LOGW(TASK_TAG, "Queue full, dropping GPS data");
 						}
+						
 
-						/*ESP_LOGI(TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", */
-						/*	gps->day, */
-						/*	gps->month, */
-						/*	gps->year, */
-						/*	gps->hour, */
-						/*	gps->minute, */
-						/*	gps->second, */
-						/*	gps->latitude,*/
-						/*	gps->longitude,*/
-						/*	gps->speed,*/
-						/*	gps->cog,*/
-						/*	gps->direction*/
-						/*); */
+						ESP_LOGI(TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", 
+							gps->day, 
+							gps->month, 
+							gps->year, 
+							gps->hour, 
+							gps->minute, 
+							gps->second, 
+							gps->latitude,
+							gps->longitude,
+							gps->speed,
+							gps->cog,
+							gps->direction
+						); 
+						vTaskDelay(pdMS_TO_TICKS(500));
 					}
 					sentence = buffer+i+1; // Shift line read pointer over 
 				}
