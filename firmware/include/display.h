@@ -24,7 +24,7 @@ typedef struct {
 	QueueHandle_t *accel_queue;
 	QueueHandle_t *gps_queue;
 	i2c_master_bus_handle_t *i2c_bus;
-} display_params_t;
+} display_args_t;
 
 // Public function declarations
 void sensor_display_task(void *arg);

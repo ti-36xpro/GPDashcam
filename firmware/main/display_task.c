@@ -41,8 +41,11 @@ void draw_char(uint8_t x, uint8_t y, char c);
 void draw_string(uint8_t x, uint8_t y, const char *str);
 
 // Task to update sensor display
-void sensor_display_task(void *params) {
-	display_params_t *args = (display_params_t *)params; 
+void sensor_display_task(void *args) {
+	// Grab arguments
+	QueueHandle_t *accel_queue = ((display_args_t *)args)->accel_queue; 
+	QueueHandle_t *gps_queue = ((display_args_t *)args)->gps_queue;
+	i2c_master_bus_handle_t *i2c_bus = ((display_args_t *)args)->i2c_bus;
 
     ESP_LOGI(TAG, "Install SSD1306 panel driver");
     esp_lcd_panel_io_i2c_config_t io_config = {
@@ -55,7 +58,7 @@ void sensor_display_task(void *params) {
     };
 
     esp_lcd_panel_io_handle_t io_handle;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(*(args->i2c_bus), &io_config, &io_handle));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(*i2c_bus, &io_config, &io_handle));
 
     esp_lcd_panel_handle_t panel;
     esp_lcd_panel_dev_config_t panel_config = {
@@ -72,24 +75,24 @@ void sensor_display_task(void *params) {
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
 
     char buf[128];
-	accel_t accel_received = {0}; 
-	rmc_statement gps_received = {0};
+	accel_data_t *accel_data = calloc(1, sizeof(accel_data_t)); 
+	gps_data_t *gps_data = calloc(1, sizeof(gps_data_t));
 
     while (1) {
-		xQueueReceive(*(args->accel_queue), &accel_received, portMAX_DELAY);
-		xQueueReceive(*(args->gps_queue), &gps_received, portMAX_DELAY);
+		xQueueReceive(*accel_queue, accel_data, portMAX_DELAY);
+		xQueueReceive(*gps_queue, gps_data, portMAX_DELAY);
 		snprintf(buf, sizeof(buf), "A: %.2f %.2f %.2f\nDate: %02d-%02d-%04d\nTime: %02d:%02d:%02d\nLat: %f\nLon: %f", 
-				accel_received.x, 
-				accel_received.y, 
-				accel_received.z,
-				gps_received.day, 
-				gps_received.month, 
-				gps_received.year, 
-				gps_received.hour, 
-				gps_received.minute, 
-				gps_received.second, 
-				gps_received.latitude,
-				gps_received.longitude);
+				accel_data->x, 
+				accel_data->y, 
+				accel_data->z,
+				gps_data->day, 
+				gps_data->month, 
+				gps_data->year, 
+				gps_data->hour, 
+				gps_data->minute, 
+				gps_data->second, 
+				gps_data->latitude,
+				gps_data->longitude);
 		oled_clear();
 
 		// Draw string into buffer at (0,0)
@@ -97,6 +100,8 @@ void sensor_display_task(void *params) {
 
 		// Send buffer to SSD1306
 		esp_lcd_panel_draw_bitmap(panel, 0, 0, LCD_H, LCD_V, oled_buffer);
+		
+		vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -204,11 +209,11 @@ static const uint8_t font5x7[96][5] = {
 void draw_char(uint8_t x, uint8_t y, char c) {
     if (c < 32 || c > 127) return;
     const uint8_t *ch = font5x7[c - 32];
-    for (int i = 0; i < 5; i++) {
+    for (uint8_t i = 0; i < 5; i++) {
         uint8_t col = ch[i];
-        for (int j = 0; j < 7; j++) {
+        for (uint8_t j = 0; j < 7; j++) {
             if (col & (1 << j)) {
-                int byte_index = ((y + j) / 8) * LCD_H + (x + i);
+                uint16_t byte_index = ((y + j) / 8) * LCD_H + (x + i);
                 oled_buffer[byte_index] |= 1 << ((y + j) % 8);
             }
         }

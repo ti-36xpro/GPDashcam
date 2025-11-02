@@ -5,25 +5,25 @@
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 
-#define I2C_FREQUENCY 100000
-#define I2C_ACCEL_ADDR 0x53
-
-void accelerometer_task(void *params) { 
+void accelerometer_task(void *args) { 
 	static const char *TASK_TAG = "ACCELEROMETER_TASK";
 	esp_log_level_set(TASK_TAG, ESP_LOG_INFO);
 
-	accel_params_t *args = (accel_params_t *)params; 
-	// Instantiate I2C accelerometer 
+	// Grab passed in arguments 
+	QueueHandle_t *accel_queue = ((accel_args_t *)args)->accel_queue; 
+	i2c_master_bus_handle_t *i2c_bus = ((accel_args_t *)args)->i2c_bus; 
+
+	// Instantiate I2C accelerometer and add to bus 
     i2c_device_config_t i2c_accel_conf = {
         .scl_speed_hz = I2C_FREQUENCY,
         .device_address = I2C_ACCEL_ADDR,
     };
     i2c_master_dev_handle_t *i2c_accel_handle = malloc(sizeof(i2c_master_dev_handle_t));
-    if (i2c_master_bus_add_device(*(args->i2c_bus), &i2c_accel_conf, i2c_accel_handle) != ESP_OK) {
+    if (i2c_master_bus_add_device(*i2c_bus, &i2c_accel_conf, i2c_accel_handle) != ESP_OK) {
         return;
     }
 	
-	accel_t* accelerometer = malloc(sizeof(accel_t)); 
+	accel_data_t* accel_data = malloc(sizeof(accel_data_t)); 
 	int16_t raw_x; 
 	int16_t raw_y; 
 	int16_t raw_z; 
@@ -39,6 +39,7 @@ void accelerometer_task(void *params) {
 	i2cset(i2c_accel_handle, 0x2d, 0x08);
 	i2cset(i2c_accel_handle, 0x31, 0x01);
 
+	// Continuously retreive accel data 
 	while (1) { 
 		i2cget(i2c_accel_handle, 0x32, data_byte);
 		raw_x = *data_byte; 
@@ -53,18 +54,20 @@ void accelerometer_task(void *params) {
 		i2cget(i2c_accel_handle, 0x37, data_byte);
 		raw_z = raw_z | *data_byte << 8; 
 		
-		accelerometer->x = (float)raw_x/128;
-		accelerometer->y = (float)raw_y/128;
-		accelerometer->z = (float)raw_z/128;
+		accel_data->x = (float)raw_x/128;
+		accel_data->y = (float)raw_y/128;
+		accel_data->z = (float)raw_z/128;
 
-		if(xQueueSend(*(args->accel_queue), accelerometer, pdMS_TO_TICKS(100)) != pdPASS){
-			ESP_LOGW(TASK_TAG, "Queue full, dropping accelerometer data."); 
-		}
-		
 		/*ESP_LOGI(TASK_TAG, "x=%.2f, y=%.2f, z=%.2f", (float)raw_x/128, (float)raw_y/128, (float)raw_z/128); */
-		vTaskDelay(pdMS_TO_TICKS(1000));
+		if(xQueueSend(*accel_queue, accel_data, pdMS_TO_TICKS(100)) != pdPASS){
+			xQueueReset(*accel_queue); 
+		}
+		vTaskDelay(pdMS_TO_TICKS(DELAY_MS));
 	}
 
+	// If task exits somehow, clean up 
+	free(accel_data); 
+	free(data_byte); 
 	i2c_master_bus_rm_device(*i2c_accel_handle);
 }
 
