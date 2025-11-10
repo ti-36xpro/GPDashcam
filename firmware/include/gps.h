@@ -16,6 +16,7 @@ extern "C" {
 // -----------------------------------------------------------------------------
 // Configuration constants
 // -----------------------------------------------------------------------------
+#define GPS_TAG "GPS_TASK"
 #define BAUD_RATE 9600
 #define QUEUE_SIZE 16
 #define RMC_SIZE 13
@@ -40,7 +41,6 @@ static const char* direction_str[] = {
 // RMC (Recommended Minimum Specific GNSS Data) structure
 // -----------------------------------------------------------------------------
 typedef struct {
-    uint8_t  valid;
     char     raw_time[10];
     uint8_t  hour;
     uint8_t  minute;
@@ -59,6 +59,7 @@ typedef struct {
 // -----------------------------------------------------------------------------
 // Function declarations
 // -----------------------------------------------------------------------------
+
 
 /**
  * @brief FreeRTOS task to read GPS NMEA sentences and parse RMC data.

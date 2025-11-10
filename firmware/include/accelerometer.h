@@ -2,11 +2,13 @@
 #define ACCELEROMETER_H
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "driver/i2c_master.h"
 
+#define ACCEL_TAG "ACCEL_TASK"
 #define I2C_FREQUENCY 100000
 #define I2C_ACCEL_ADDR 0x53
-#define DELAY_MS 1000
+#define DELAY_MS 100
 
 typedef struct { 
 	QueueHandle_t *accel_queue; 
@@ -25,10 +27,7 @@ typedef struct {
 /**
  * @brief FreeRTOS task for continuously reading accelerometer data over I2C.
  *
- * @param pvParameters Optional task parameter (unused by default).
- *
- * The task initializes the I2C bus, configures the accelerometer, and
- * periodically reads acceleration data.
+ * @param pvParameters Task parameter.
  */
 void accelerometer_task(void *pvParameters);
 

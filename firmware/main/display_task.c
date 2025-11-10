@@ -1,9 +1,11 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
 #include "driver/i2c_master.h"
+#include "esp_log.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
@@ -12,99 +14,6 @@
 #include "accelerometer.h"
 #include "gps.h"
 #include "display.h"
-
-#include <stdio.h>
-#include <unistd.h>
-
-#define TAG "lcd_simple"
-
-// I2C pins
-#define I2C_ADDR 0x3C
-
-// LCD resolution
-#define LCD_H 128
-#define LCD_V 64
-
-// LCD pixel clock
-#define LCD_PIXEL_CLOCK_HZ (400 * 1000)
-
-// Display buffer (1-bit monochrome)
-static uint8_t oled_buffer[LCD_H * LCD_V / 8];
-
-
-// clears buffer
-static void oled_clear(void) {
-    memset(oled_buffer, 0x00, sizeof(oled_buffer));
-}
-
-void draw_char(uint8_t x, uint8_t y, char c);
-void draw_string(uint8_t x, uint8_t y, const char *str);
-
-// Task to update sensor display
-void sensor_display_task(void *args) {
-	// Grab arguments
-	QueueHandle_t *accel_queue = ((display_args_t *)args)->accel_queue; 
-	QueueHandle_t *gps_queue = ((display_args_t *)args)->gps_queue;
-	i2c_master_bus_handle_t *i2c_bus = ((display_args_t *)args)->i2c_bus;
-
-    ESP_LOGI(TAG, "Install SSD1306 panel driver");
-    esp_lcd_panel_io_i2c_config_t io_config = {
-        .dev_addr = I2C_ADDR,
-        .scl_speed_hz = LCD_PIXEL_CLOCK_HZ,
-        .control_phase_bytes = 1,
-        .lcd_cmd_bits = 8,
-        .lcd_param_bits = 8,
-        .dc_bit_offset = 6,
-    };
-
-    esp_lcd_panel_io_handle_t io_handle;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(*i2c_bus, &io_config, &io_handle));
-
-    esp_lcd_panel_handle_t panel;
-    esp_lcd_panel_dev_config_t panel_config = {
-        .bits_per_pixel = 1,
-        .reset_gpio_num = -1,
-    };
-    esp_lcd_panel_ssd1306_config_t ssd1306_config = {
-        .height = LCD_V,
-    };
-    panel_config.vendor_config = &ssd1306_config;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
-
-    char buf[128];
-	accel_data_t *accel_data = calloc(1, sizeof(accel_data_t)); 
-	gps_data_t *gps_data = calloc(1, sizeof(gps_data_t));
-
-    while (1) {
-		xQueueReceive(*accel_queue, accel_data, portMAX_DELAY);
-		xQueueReceive(*gps_queue, gps_data, portMAX_DELAY);
-		snprintf(buf, sizeof(buf), "A: %.2f %.2f %.2f\nDate: %02d-%02d-%04d\nTime: %02d:%02d:%02d\nLat: %f\nLon: %f", 
-				accel_data->x, 
-				accel_data->y, 
-				accel_data->z,
-				gps_data->day, 
-				gps_data->month, 
-				gps_data->year, 
-				gps_data->hour, 
-				gps_data->minute, 
-				gps_data->second, 
-				gps_data->latitude,
-				gps_data->longitude);
-		oled_clear();
-
-		// Draw string into buffer at (0,0)
-		draw_string(0, 0, buf);
-
-		// Send buffer to SSD1306
-		esp_lcd_panel_draw_bitmap(panel, 0, 0, LCD_H, LCD_V, oled_buffer);
-		
-		vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-}
-
 
 // 5x7 font table (ASCII 0x20–0x7F)
 static const uint8_t font5x7[96][5] = {
@@ -205,8 +114,15 @@ static const uint8_t font5x7[96][5] = {
     {0x02,0x01,0x02,0x04,0x02}, // '~'
 };
 
+// Display buffer (1-bit monochrome)
+static uint8_t oled_buffer[LCD_H * LCD_V / 8];
 
-void draw_char(uint8_t x, uint8_t y, char c) {
+// clears buffer
+static void oled_clear(void) {
+    memset(oled_buffer, 0, sizeof(oled_buffer));
+}
+
+static void draw_char(uint8_t x, uint8_t y, char c) {
     if (c < 32 || c > 127) return;
     const uint8_t *ch = font5x7[c - 32];
     for (uint8_t i = 0; i < 5; i++) {
@@ -220,7 +136,7 @@ void draw_char(uint8_t x, uint8_t y, char c) {
     }
 }
 
-void draw_string(uint8_t x, uint8_t y, const char *str) {
+static void draw_string(uint8_t x, uint8_t y, const char *str) {
     uint8_t cursor_x = x;
     uint8_t cursor_y = y;
     while (*str) {
@@ -231,6 +147,71 @@ void draw_string(uint8_t x, uint8_t y, const char *str) {
             draw_char(cursor_x, cursor_y, *str);
             cursor_x += 6;
         }
-        str++;
+		++str; 
     }
 }
+// Task to update sensor display
+void sensor_display_task(void *args) {
+	// Grab arguments
+	QueueHandle_t *accel_queue = ((display_args_t *)args)->accel_queue; 
+	QueueHandle_t *gps_queue = ((display_args_t *)args)->gps_queue;
+	i2c_master_bus_handle_t *i2c_bus = ((display_args_t *)args)->i2c_bus;
+
+	// Initialize display 
+    ESP_LOGI(DISPLAY_TAG, "Install SSD1306 panel driver");
+    esp_lcd_panel_io_i2c_config_t io_config = {
+        .dev_addr = I2C_ADDR,
+        .scl_speed_hz = LCD_PIXEL_CLOCK_HZ,
+        .control_phase_bytes = 1,
+        .lcd_cmd_bits = 8,
+        .lcd_param_bits = 8,
+        .dc_bit_offset = 6,
+    };
+    esp_lcd_panel_io_handle_t io_handle;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(*i2c_bus, &io_config, &io_handle));
+    esp_lcd_panel_handle_t panel;
+    esp_lcd_panel_dev_config_t panel_config = {
+        .bits_per_pixel = 1,
+        .reset_gpio_num = -1,
+    };
+    esp_lcd_panel_ssd1306_config_t ssd1306_config = {
+        .height = LCD_V,
+    };
+    panel_config.vendor_config = &ssd1306_config;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+
+    char buffer[BUFFER_SIZE];
+	accel_data_t *accel_data = calloc(1, sizeof(accel_data_t)); 
+	gps_data_t *gps_data = calloc(1, sizeof(gps_data_t));
+
+    while (1) {
+		if(!xQueueReceive(*accel_queue, accel_data, 0) && !xQueueReceive(*gps_queue, gps_data, 0)) continue; 
+		snprintf(buffer, sizeof(buffer), "A: %.2f %.2f %.2f\nDate: %02d-%02d-%04d\nTime: %02d:%02d:%02d\nLat: %f\nLon: %f", 
+				accel_data->x, 
+				accel_data->y, 
+				accel_data->z,
+				gps_data->day, 
+				gps_data->month, 
+				gps_data->year, 
+				gps_data->hour, 
+				gps_data->minute, 
+				gps_data->second, 
+				gps_data->latitude,
+				gps_data->longitude);
+		oled_clear();
+
+		// Draw string into buffer at (0,0)
+		draw_string(0, 0, buffer);
+
+		// Send buffer to SSD1306
+		esp_lcd_panel_draw_bitmap(panel, 0, 0, LCD_H, LCD_V, oled_buffer);
+		/*ESP_LOGI(DISPLAY_TAG, "High water mark: %d", uxTaskGetStackHighWaterMark(NULL)); ;*/
+    }
+}
+
+
+
+

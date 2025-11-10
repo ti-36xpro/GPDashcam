@@ -1,13 +1,10 @@
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
+#include <stdint.h>
 #include "i2c_tools.h"
 #include "accelerometer.h"
-#include "driver/i2c_master.h"
 #include "esp_log.h"
 
 void accelerometer_task(void *args) { 
-	static const char *TASK_TAG = "ACCELEROMETER_TASK";
-	esp_log_level_set(TASK_TAG, ESP_LOG_INFO);
+	esp_log_level_set(ACCEL_TAG, ESP_LOG_INFO);
 
 	// Grab passed in arguments 
 	QueueHandle_t *accel_queue = ((accel_args_t *)args)->accel_queue; 
@@ -58,10 +55,9 @@ void accelerometer_task(void *args) {
 		accel_data->y = (float)raw_y/128;
 		accel_data->z = (float)raw_z/128;
 
-		/*ESP_LOGI(TASK_TAG, "x=%.2f, y=%.2f, z=%.2f", (float)raw_x/128, (float)raw_y/128, (float)raw_z/128); */
-		if(xQueueSend(*accel_queue, accel_data, pdMS_TO_TICKS(100)) != pdPASS){
-			xQueueReset(*accel_queue); 
-		}
+		/*ESP_LOGI(ACCEL_TAG, "x=%.2f, y=%.2f, z=%.2f", (float)raw_x/128, (float)raw_y/128, (float)raw_z/128); */
+		/*ESP_LOGI(ACCEL_TAG, "High water mark: %d", uxTaskGetStackHighWaterMark(NULL)); ;*/
+		xQueueOverwrite(*accel_queue, accel_data);
 		vTaskDelay(pdMS_TO_TICKS(DELAY_MS));
 	}
 

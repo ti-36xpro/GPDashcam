@@ -82,7 +82,7 @@ static void parse_fields(char *fields[], gps_data_t *gps_data){
 		gps_data->raw_time[9] = '\0';
 		strncpy(gps_data->raw_date, fields[9], 6); 
 		gps_data->raw_date[6] = '\0';
-	parse_date_time(gps_data); 
+		parse_date_time(gps_data); 
 	}
 	// Parse for latitude and longitude 
 	if(fields[3] && fields[3][0] != '\0' &&
@@ -105,8 +105,6 @@ static void parse_fields(char *fields[], gps_data_t *gps_data){
 }
 
 void gps_task(void *arg) {
-	static const char *TASK_TAG = "GPS_TASK";
-
 	QueueHandle_t gps_queue = (QueueHandle_t)arg; 
 	QueueHandle_t uart_queue;
 	// Initalize UART 
@@ -128,69 +126,71 @@ void gps_task(void *arg) {
 	gps_data_t *gps_data = malloc(sizeof(gps_data_t)); 
 	char *fields[RMC_SIZE]; 
 	char *sentence_remainder; 
-	uint8_t field_count; 
 
-	ESP_LOGI(TASK_TAG, "Initialized"); 
+	ESP_LOGI(GPS_TAG, "Initialized"); 
 
 	while(1) {
 		uint8_t len = uart_read_bytes(UART_NUM_1, buffer, RX_BUFFER_SIZE, pdMS_TO_TICKS(100));
-		if(len > 0) {
-			char *sentence = buffer;
-			// Loop through all received bytes 
-			for(uint8_t i=0;i<len;i++) {
-				if(buffer[i]=='\n') {
-					// Replace detected newline with the string complete character 
-					buffer[i]='\0';
-					if (sentence[5] == 'C') { 
-						field_count = 0; 
-						memset(gps_data, 0, sizeof(gps_data_t));
-						sentence_remainder = sentence; 
-						// Parse RMC statement into an array using comma separation 
-						// Empty fields are still recorded into array to keep consistent
-						// indexing
-						for (char *p = sentence; ; ++p) {
-							if (*p == ',' || *p == '\0') {
-								// temporarily terminate current field
-								char temp = *p;
-								*p = '\0';
+		if(len == 0) continue;
 
-								// store pointer to start of field (even if empty)
-								fields[field_count++] = sentence_remainder;
+		char *sentence = buffer;
+		// Loop through all received bytes 
+		for(uint8_t i=0; i<len; ++i) {
+			if(buffer[i]=='\n') {
+				// Replace detected newline with the string complete character 
+				// Now sentence has the line 
+				buffer[i]='\0';
 
-								// restore character if not end of string
-								if (temp == '\0' || field_count >= RMC_SIZE)
-									break;
-
-								// next field starts after comma
-								sentence_remainder = p + 1;
-							}
-						}
-
-						parse_fields(fields, gps_data); 
-						if (xQueueSend(gps_queue, gps_data, pdMS_TO_TICKS(100)) != pdPASS) {
-							ESP_LOGW(TASK_TAG, "Queue full, dropping GPS data");
-						}
-						
-						/*ESP_LOGI(TASK_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", */
-						/*	gps_data->day, */
-						/*	gps_data->month, */
-						/*	gps_data->year, */
-						/*	gps_data->hour, */
-						/*	gps_data->minute, */
-						/*	gps_data->second, */
-						/*	gps_data->latitude,*/
-						/*	gps_data->longitude,*/
-						/*	gps_data->speed,*/
-						/*	gps_data->cog,*/
-						/*	gps_data->direction*/
-						/*); */
-
-						vTaskDelay(pdMS_TO_TICKS(500));
-					}
+				// Check for $GPRMC that contains data 
+				if (sentence[5]!='C' || strlen(sentence)<26) { 
 					sentence = buffer+i+1; // Shift line read pointer over 
+					continue; 
 				}
-			}
 
+				uint8_t field_count = 0; 
+				memset(gps_data, 0, sizeof(gps_data_t));
+				sentence_remainder = sentence; 
+				// Parse RMC sentence into an array using comma separation 
+				// Empty fields are still recorded into array to keep consistent
+				// indexing
+				for (char *p = sentence; ; ++p) {
+					if (*p == ',' || *p == '\0') {
+						// Temporarily terminate current field
+						char temp = *p;
+						*p = '\0';
+
+						// store pointer to start of field (even if empty)
+						fields[field_count++] = sentence_remainder;
+
+						// restore character if not end of string
+						if (temp == '\0' || field_count >= RMC_SIZE)
+							break;
+
+						// next field starts after comma
+						sentence_remainder = p + 1;
+					}
+				}
+
+				parse_fields(fields, gps_data); 
+				if(xQueueSend(gps_queue, gps_data, pdMS_TO_TICKS(100)) != pdPASS) {
+					ESP_LOGW(GPS_TAG, "Queue full, dropping GPS data");
+				}
+				ESP_LOGI(GPS_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", 
+						gps_data->day, 
+						gps_data->month, 
+						gps_data->year, 
+						gps_data->hour, 
+						gps_data->minute, 
+						gps_data->second, 
+						gps_data->latitude,
+						gps_data->longitude,
+						gps_data->speed,
+						gps_data->cog,
+						gps_data->direction
+						); 
+				ESP_LOGI(GPS_TAG, "High water mark: %d", uxTaskGetStackHighWaterMark(NULL)); ;
+				vTaskDelay(pdMS_TO_TICKS(100));
+			}
 		}
 	}
     free(buffer);
