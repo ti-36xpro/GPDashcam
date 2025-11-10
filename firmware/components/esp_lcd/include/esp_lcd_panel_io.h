@@ -10,7 +10,6 @@
 #include "esp_lcd_types.h"
 #include "esp_lcd_io_i80.h"
 #include "esp_lcd_io_i2c.h"
-#include "esp_lcd_io_spi.h"
 
 #ifdef __cplusplus
 extern "C" {
