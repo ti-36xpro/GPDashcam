@@ -15,9 +15,6 @@ extern "C" {
 typedef struct {
     const char** names;
     const int* pins;
-#if CONFIG_EXAMPLE_ENABLE_ADC_FEATURE
-    const int *adc_channels;
-#endif
 } pin_configuration_t;
 
 

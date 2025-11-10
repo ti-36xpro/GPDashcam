@@ -4,6 +4,7 @@
 #include "accelerometer.h"
 #include "gps.h"
 #include "display.h"
+#include "sd_card.h"
 
 #define MAIN_TAG "MAIN_TASK"
 
@@ -43,9 +44,10 @@ void app_main(void) {
 
 	// Create tasks 
 	ESP_LOGI(MAIN_TAG, "Creating tasks");
-	xTaskCreate(accelerometer_task, ACCEL_TAG, 2500, &accel_args, 5, NULL); 
-	xTaskCreate(gps_task, GPS_TAG, 4500, gps_queue, 5, NULL);
+	xTaskCreate(accelerometer_task, ACCEL_TAG, 2500, &accel_args, 4, NULL); 
+	xTaskCreate(gps_task, GPS_TAG, 4500, gps_queue, 4, NULL);
     xTaskCreate(sensor_display_task, DISPLAY_TAG, 4096, &display_args, 4, NULL);
+    xTaskCreate(sd_card_task, SD_CARD_TAG, 4096, NULL, 4, NULL);
 
 	while(1){ 
 		vTaskDelay(pdMS_TO_TICKS(10000));
