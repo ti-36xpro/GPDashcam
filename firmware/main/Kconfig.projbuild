@@ -20,27 +20,27 @@ menu "GPDashcam Configuration"
 
     choice SDMMC_BUS_WIDTH
         prompt "SD/MMC bus width"
-        default EXAMPLE_SDMMC_BUS_WIDTH_4
+        default SDMMC_BUS_WIDTH_4
 
-        config EXAMPLE_SDMMC_BUS_WIDTH_4
+        config SDMMC_BUS_WIDTH_4
             bool "4 lines (D0 - D3)"
 
-        config EXAMPLE_SDMMC_BUS_WIDTH_1
+        config SDMMC_BUS_WIDTH_1
             bool "1 line (D0)"
     endchoice
 
     choice SDMMC_SPEED_MODE
         prompt "SD/MMC speed mode"
-        default EXAMPLE_SDMMC_SPEED_DS
+        default SDMMC_SPEED_DS
 
-        config EXAMPLE_SDMMC_SPEED_DS
+        config SDMMC_SPEED_DS
             bool "Default Speed"
-        config EXAMPLE_SDMMC_SPEED_HS
+        config SDMMC_SPEED_HS
             bool "High Speed"
-        config EXAMPLE_SDMMC_SPEED_UHS_I_SDR50
+        config SDMMC_SPEED_UHS_I_SDR50
             bool "UHS-I SDR50 (100 MHz, 50 MB/s)"
             depends on SOC_SDMMC_UHS_I_SUPPORTED
-        config EXAMPLE_SDMMC_SPEED_UHS_I_DDR50
+        config SDMMC_SPEED_UHS_I_DDR50
             bool "UHS-I DDR50 (50 MHz, 50 MB/s)"
             depends on SOC_SDMMC_UHS_I_SUPPORTED
     endchoice
@@ -60,23 +60,23 @@ menu "GPDashcam Configuration"
         prompt "D0 pin number"
         default 47
 
-    if EXAMPLE_SDMMC_BUS_WIDTH_4
+    if SDMMC_BUS_WIDTH_4
 
-        config EXAMPLE_PIN_D1
+        config D1_PIN_NUM
             int
-            prompt "D1 GPIO number"
+            prompt "D1 pin number"
             default 21 
 
-        config EXAMPLE_PIN_D2
+        config D2_PIN_NUM
             int
-            prompt "D2 GPIO number"
+            prompt "D2 pin number"
             default 41
 
 
-        config EXAMPLE_PIN_D3
+        config D3_PIN_NUM
             int
-            prompt "D3 GPIO number"
+            prompt "D3 pin number"
             default 40
 
-    endif  # EXAMPLE_SDMMC_BUS_WIDTH_4
+    endif  # SDMMC_BUS_WIDTH_4
 endmenu
