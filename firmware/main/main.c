@@ -4,7 +4,7 @@
 #include "accelerometer.h"
 #include "gps.h"
 #include "display.h"
-#include "sd_card.h"
+#include "sd.h"
 #include "i2c_common.h"
 
 #define MAIN_TAG "MAIN_TASK"
@@ -23,18 +23,23 @@ void app_main(void) {
 	};
 	ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &i2c_bus));
 
-	// Initialize queues 
+	// Instantiate queues 
 	ESP_LOGI(MAIN_TAG, "Create queues");
 	QueueHandle_t accel_to_display_queue = xQueueCreate(1, sizeof(accel_data_t)); 
-	QueueHandle_t gps_to_display_queue = xQueueCreate(10, sizeof(gps_data_t)); 
+	QueueHandle_t gps_to_display_queue = xQueueCreate(1, sizeof(gps_data_t)); 
+	QueueHandle_t gps_to_sd_queue = xQueueCreate(1, sizeof(gps_data_t)); 
 
+	// Instantiate args struct pointers 
+	// Done in this manner because we have flexible array members 
 	i2c_task_args_t *accel_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 1*sizeof(QueueHandle_t*)); 
 	i2c_task_args_t *display_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 2*sizeof(QueueHandle_t*)); 
 
-	// Set up task arguments
+	// Populating task arguments
+	// To sent to accelerometer task 
 	accel_args->i2c_bus = &i2c_bus;
 	accel_args->queues[0] = &accel_to_display_queue;
 
+	// To sent to display task 
 	display_args->i2c_bus = &i2c_bus; 
 	display_args->queues[0] = &accel_to_display_queue;
 	display_args->queues[1] = &gps_to_display_queue;
@@ -44,7 +49,7 @@ void app_main(void) {
 	xTaskCreate(accelerometer_task, ACCEL_TAG, 2500, accel_args, 4, NULL); 
 	xTaskCreate(gps_task, GPS_TAG, 4500, gps_to_display_queue, 4, NULL);
     xTaskCreate(display_task, DISPLAY_TAG, 4096, display_args, 4, NULL);
-    xTaskCreate(sd_card_task, SD_CARD_TAG, 4096, NULL, 4, NULL);
+    xTaskCreate(sd_task, SD_TAG, 4096, NULL, 4, NULL);
 
 	while(1){ 
 		vTaskDelay(pdMS_TO_TICKS(10000));

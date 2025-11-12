@@ -172,9 +172,7 @@ void gps_task(void *arg) {
 				}
 
 				parse_fields(fields, gps_data); 
-				if(xQueueSend(gps_queue, gps_data, pdMS_TO_TICKS(100)) != pdPASS) {
-					ESP_LOGW(GPS_TAG, "Queue full, dropping GPS data");
-				}
+				xQueueOverwrite(gps_queue, gps_data);
 				ESP_LOGI(GPS_TAG, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %f degrees, heading %s", 
 						gps_data->day, 
 						gps_data->month, 

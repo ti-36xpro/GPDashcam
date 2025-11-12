@@ -6,8 +6,8 @@
  * CONDITIONS OF ANY KIND, either express or implied.
  */
 
-#ifndef SD_CARD_EXAMPLE_H_
-#define SD_CARD_EXAMPLE_H_
+#ifndef SD_EXAMPLE_H_
+#define SD_EXAMPLE_H_
 
 #include <string.h>
 #include <sys/unistd.h>
@@ -32,17 +32,17 @@ extern "C" {
 /** @brief Determine if UHS-I mode is enabled */
 #define IS_UHS1    (CONFIG_SDMMC_SPEED_UHS_I_SDR50 || CONFIG_SDMMC_SPEED_UHS_I_DDR50)
 
-#define SD_CARD_TAG "SD_CARD_TASK"
+#define SD_TAG "SD_TASK"
 
 /**
  * @brief SD card main task: initializes, mounts, reads/writes test files, and unmounts
  *
  * @param args Optional argument pointer for FreeRTOS task (unused)
  */
-void sd_card_task(void *args);
+void sd_task(void *args);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* SD_CARD_EXAMPLE_H_ */
+#endif /* SD_EXAMPLE_H_ */

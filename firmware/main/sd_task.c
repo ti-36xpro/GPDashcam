@@ -13,27 +13,27 @@
 #include "sdmmc_cmd.h"
 #include "driver/sdmmc_host.h"
 #include "sd_test_io.h"
-#include "sd_card.h"
+#include "sd.h"
 
 static esp_err_t s_example_write_file(const char *path, char *data) {
-    ESP_LOGI(SD_CARD_TAG, "Opening file %s", path);
+    ESP_LOGI(SD_TAG, "Opening file %s", path);
     FILE *f = fopen(path, "w");
     if (f == NULL) {
-        ESP_LOGE(SD_CARD_TAG, "Failed to open file for writing");
+        ESP_LOGE(SD_TAG, "Failed to open file for writing");
         return ESP_FAIL;
     }
     fprintf(f, data);
     fclose(f);
-    ESP_LOGI(SD_CARD_TAG, "File written");
+    ESP_LOGI(SD_TAG, "File written");
 
     return ESP_OK;
 }
 
 static esp_err_t s_example_read_file(const char *path) {
-    ESP_LOGI(SD_CARD_TAG, "Reading file %s", path);
+    ESP_LOGI(SD_TAG, "Reading file %s", path);
     FILE *f = fopen(path, "r");
     if (f == NULL) {
-        ESP_LOGE(SD_CARD_TAG, "Failed to open file for reading");
+        ESP_LOGE(SD_TAG, "Failed to open file for reading");
         return ESP_FAIL;
     }
     char line[MAX_CHAR_SIZE];
@@ -45,12 +45,12 @@ static esp_err_t s_example_read_file(const char *path) {
     if (pos) {
         *pos = '\0';
     }
-    ESP_LOGI(SD_CARD_TAG, "Read from file: '%s'", line);
+    ESP_LOGI(SD_TAG, "Read from file: '%s'", line);
 
     return ESP_OK;
 }
 
-void sd_card_task(void *args) { 
+void sd_task(void *args) { 
     esp_err_t ret;
 
     // Options for mounting the filesystem.
@@ -61,14 +61,14 @@ void sd_card_task(void *args) {
     };
     sdmmc_card_t *card;
     const char mount_point[] = MOUNT_POINT;
-    ESP_LOGI(SD_CARD_TAG, "Initializing SD card");
+    ESP_LOGI(SD_TAG, "Initializing SD card");
 
     // Use settings defined above to initialize SD card and mount FAT filesystem.
     // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
     // Please check its source code and implement error recovery when developing
     // production applications.
 
-    ESP_LOGI(SD_CARD_TAG, "Using SDMMC peripheral");
+    ESP_LOGI(SD_TAG, "Using SDMMC peripheral");
 
     // By default, SD card frequency is initialized to SDMMC_FREQ_DEFAULT (20MHz)
     // For setting a specific frequency, use host.max_freq_khz (range 400kHz - 40MHz for SDMMC)
@@ -107,19 +107,19 @@ void sd_card_task(void *args) {
 #endif  // CONFIG_SDMMC_BUS_WIDTH_4
 
 
-    ESP_LOGI(SD_CARD_TAG, "Mounting filesystem");
+    ESP_LOGI(SD_TAG, "Mounting filesystem");
     ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
-            ESP_LOGE(SD_CARD_TAG, "Failed to mount filesystem. ");
+            ESP_LOGE(SD_TAG, "Failed to mount filesystem. ");
         } else {
-            ESP_LOGE(SD_CARD_TAG, "Failed to initialize the card (%s). "
+            ESP_LOGE(SD_TAG, "Failed to initialize the card (%s). "
                      "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
         }
         return;
     }
-    ESP_LOGI(SD_CARD_TAG, "Filesystem mounted");
+    ESP_LOGI(SD_TAG, "Filesystem mounted");
 
     // Card has been initialized, print its properties
     sdmmc_card_print_info(stdout, card);
@@ -144,9 +144,9 @@ void sd_card_task(void *args) {
     }
 
     // Rename original file
-    ESP_LOGI(SD_CARD_TAG, "Renaming file %s to %s", file_hello, file_foo);
+    ESP_LOGI(SD_TAG, "Renaming file %s to %s", file_hello, file_foo);
     if (rename(file_hello, file_foo) != 0) {
-        ESP_LOGE(SD_CARD_TAG, "Rename failed");
+        ESP_LOGE(SD_TAG, "Rename failed");
         return;
     }
 
@@ -171,7 +171,7 @@ void sd_card_task(void *args) {
 
     // All done, unmount partition and disable SDMMC peripheral
     esp_vfs_fat_sdcard_unmount(mount_point, card);
-    ESP_LOGI(SD_CARD_TAG, "Card unmounted");
+    ESP_LOGI(SD_TAG, "Card unmounted");
 
 	while(1) { 
 		vTaskDelay(pdMS_TO_TICKS(10000));
