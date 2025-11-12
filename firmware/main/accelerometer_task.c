@@ -1,14 +1,53 @@
 #include <stdint.h>
-#include "i2c_tools.h"
+#include "driver/i2c_master.h"
 #include "accelerometer.h"
 #include "esp_log.h"
+#include "i2c_common.h"
+
+#define I2C_TOOL_TIMEOUT_VALUE_MS (50)
+
+static uint8_t i2cget(i2c_master_dev_handle_t *i2c_dev_handle, uint8_t data_addr, uint8_t *data) {
+    uint8_t len = 1;
+
+    esp_err_t ret = i2c_master_transmit_receive(*i2c_dev_handle, (uint8_t*)&data_addr, 1, data, len, I2C_TOOL_TIMEOUT_VALUE_MS);
+    if (ret == ESP_OK) {
+    } else if (ret == ESP_ERR_TIMEOUT) {
+        ESP_LOGW(ACCEL_TAG, "Bus is busy");
+		return 1; 
+    } else {
+        ESP_LOGW(ACCEL_TAG, "Read failed");
+		return 1; 
+    }
+    return 0;
+}
+
+static uint8_t i2cset(i2c_master_dev_handle_t *i2c_dev_handle, uint8_t data_addr, uint8_t data) {
+    int len = 1;
+
+    uint8_t *register_data = malloc(len + 1);
+    register_data[0] = data_addr;
+	register_data[1] = data;
+    esp_err_t ret = i2c_master_transmit(*i2c_dev_handle, register_data, len + 1, I2C_TOOL_TIMEOUT_VALUE_MS);
+    if (ret == ESP_OK) {
+		ESP_LOGI(ACCEL_TAG, "Write OK");
+	} else if (ret == ESP_ERR_TIMEOUT) {
+        ESP_LOGW(ACCEL_TAG, "Bus is busy");
+		return 1; 
+    } else {
+        ESP_LOGW(ACCEL_TAG, "Write Failed");
+		return 1; 
+    }
+
+    free(register_data);
+    return 0;
+}
 
 void accelerometer_task(void *args) { 
 	esp_log_level_set(ACCEL_TAG, ESP_LOG_INFO);
 
 	// Grab passed in arguments 
-	QueueHandle_t *accel_queue = ((accel_args_t *)args)->accel_queue; 
-	i2c_master_bus_handle_t *i2c_bus = ((accel_args_t *)args)->i2c_bus; 
+	i2c_master_bus_handle_t *i2c_bus = ((i2c_task_args_t*)args)->i2c_bus; 
+	QueueHandle_t *accel_to_display_queue = ((i2c_task_args_t*)args)->queues[0]; 
 
 	// Instantiate I2C accelerometer and add to bus 
     i2c_device_config_t i2c_accel_conf = {
@@ -19,13 +58,13 @@ void accelerometer_task(void *args) {
     if (i2c_master_bus_add_device(*i2c_bus, &i2c_accel_conf, i2c_accel_handle) != ESP_OK) {
         return;
     }
-	
+
 	accel_data_t* accel_data = malloc(sizeof(accel_data_t)); 
+	uint8_t* data_byte = malloc(sizeof(uint8_t)); 
+
 	int16_t raw_x; 
 	int16_t raw_y; 
 	int16_t raw_z; 
-
-	uint8_t* data_byte = malloc(sizeof(uint8_t)); 
 
 	// TODO: Figure out why I2C device needs to be woken up. 
 	// Current inelegant solution is to poke it with a read. 
@@ -57,7 +96,7 @@ void accelerometer_task(void *args) {
 
 		/*ESP_LOGI(ACCEL_TAG, "x=%.2f, y=%.2f, z=%.2f", (float)raw_x/128, (float)raw_y/128, (float)raw_z/128); */
 		/*ESP_LOGI(ACCEL_TAG, "High water mark: %d", uxTaskGetStackHighWaterMark(NULL)); ;*/
-		xQueueOverwrite(*accel_queue, accel_data);
+		xQueueOverwrite(*accel_to_display_queue, accel_data);
 		vTaskDelay(pdMS_TO_TICKS(DELAY_MS));
 	}
 

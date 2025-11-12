@@ -14,6 +14,7 @@
 #include "accelerometer.h"
 #include "gps.h"
 #include "display.h"
+#include "i2c_common.h"
 
 // 5x7 font table (ASCII 0x20–0x7F)
 static const uint8_t font5x7[96][5] = {
@@ -151,11 +152,11 @@ static void draw_string(uint8_t x, uint8_t y, const char *str) {
     }
 }
 // Task to update sensor display
-void sensor_display_task(void *args) {
+void display_task(void *args) {
 	// Grab arguments
-	QueueHandle_t *accel_queue = ((display_args_t *)args)->accel_queue; 
-	QueueHandle_t *gps_queue = ((display_args_t *)args)->gps_queue;
-	i2c_master_bus_handle_t *i2c_bus = ((display_args_t *)args)->i2c_bus;
+	QueueHandle_t *accel_queue = ((i2c_task_args_t*)args)->queues[0]; 
+	QueueHandle_t *gps_queue = ((i2c_task_args_t*)args)->queues[1];
+	i2c_master_bus_handle_t *i2c_bus = ((i2c_task_args_t*)args)->i2c_bus;
 
 	// Initialize display 
     ESP_LOGI(DISPLAY_TAG, "Install SSD1306 panel driver");
@@ -168,7 +169,7 @@ void sensor_display_task(void *args) {
         .dc_bit_offset = 6,
     };
     esp_lcd_panel_io_handle_t io_handle;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(*i2c_bus, &io_config, &io_handle));
+	ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(*i2c_bus, &io_config, &io_handle));
     esp_lcd_panel_handle_t panel;
     esp_lcd_panel_dev_config_t panel_config = {
         .bits_per_pixel = 1,

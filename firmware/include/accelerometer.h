@@ -10,11 +10,6 @@
 #define I2C_ACCEL_ADDR 0x53
 #define DELAY_MS 100
 
-typedef struct { 
-	QueueHandle_t *accel_queue; 
-	i2c_master_bus_handle_t *i2c_bus;
-} accel_args_t;
-
 /**
  * @brief Struct representing acceleration data in 3 axes (x, y, z).
  */

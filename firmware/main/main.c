@@ -5,6 +5,7 @@
 #include "gps.h"
 #include "display.h"
 #include "sd_card.h"
+#include "i2c_common.h"
 
 #define MAIN_TAG "MAIN_TASK"
 
@@ -24,35 +25,31 @@ void app_main(void) {
 
 	// Initialize queues 
 	ESP_LOGI(MAIN_TAG, "Create queues");
-	QueueHandle_t accel_queue; 
-	QueueHandle_t gps_queue; 
-	gps_queue = xQueueCreate(10, sizeof(gps_data_t)); 
-	accel_queue = xQueueCreate(1, sizeof(accel_data_t)); 
+	QueueHandle_t accel_to_display_queue = xQueueCreate(1, sizeof(accel_data_t)); 
+	QueueHandle_t gps_to_display_queue = xQueueCreate(10, sizeof(gps_data_t)); 
+
+	i2c_task_args_t *accel_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 1*sizeof(QueueHandle_t*)); 
+	i2c_task_args_t *display_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 2*sizeof(QueueHandle_t*)); 
 
 	// Set up task arguments
-	ESP_LOGI(MAIN_TAG, "Assemble task arguments");
-	accel_args_t accel_args = {
-		.accel_queue = &accel_queue, 
-		.i2c_bus = &i2c_bus
-	}; 
+	accel_args->i2c_bus = &i2c_bus;
+	accel_args->queues[0] = &accel_to_display_queue;
 
-	display_args_t display_args= {
-		.accel_queue = &accel_queue, 
-		.gps_queue = &gps_queue, 
-		.i2c_bus = &i2c_bus
-	}; 
+	display_args->i2c_bus = &i2c_bus; 
+	display_args->queues[0] = &accel_to_display_queue;
+	display_args->queues[1] = &gps_to_display_queue;
 
 	// Create tasks 
 	ESP_LOGI(MAIN_TAG, "Creating tasks");
-	xTaskCreate(accelerometer_task, ACCEL_TAG, 2500, &accel_args, 4, NULL); 
-	xTaskCreate(gps_task, GPS_TAG, 4500, gps_queue, 4, NULL);
-    xTaskCreate(sensor_display_task, DISPLAY_TAG, 4096, &display_args, 4, NULL);
+	xTaskCreate(accelerometer_task, ACCEL_TAG, 2500, accel_args, 4, NULL); 
+	xTaskCreate(gps_task, GPS_TAG, 4500, gps_to_display_queue, 4, NULL);
+    xTaskCreate(display_task, DISPLAY_TAG, 4096, display_args, 4, NULL);
     xTaskCreate(sd_card_task, SD_CARD_TAG, 4096, NULL, 4, NULL);
 
 	while(1){ 
 		vTaskDelay(pdMS_TO_TICKS(10000));
 	}
-	free(gps_queue); 
-	free(accel_queue); 
+	free(gps_to_display_queue); 
+	free(accel_to_display_queue); 
 }
 
