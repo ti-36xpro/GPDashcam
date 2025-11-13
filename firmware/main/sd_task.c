@@ -14,10 +14,11 @@
 #include "driver/sdmmc_host.h"
 #include "sd_test_io.h"
 #include "sd.h"
+#include "gps.h"
 
-static esp_err_t s_example_write_file(const char *path, char *data) {
+static esp_err_t append_file(const char *path, char *data) {
     ESP_LOGI(SD_TAG, "Opening file %s", path);
-    FILE *f = fopen(path, "w");
+    FILE *f = fopen(path, "a");
     if (f == NULL) {
         ESP_LOGE(SD_TAG, "Failed to open file for writing");
         return ESP_FAIL;
@@ -29,7 +30,7 @@ static esp_err_t s_example_write_file(const char *path, char *data) {
     return ESP_OK;
 }
 
-static esp_err_t s_example_read_file(const char *path) {
+static esp_err_t read_file(const char *path) {
     ESP_LOGI(SD_TAG, "Reading file %s", path);
     FILE *f = fopen(path, "r");
     if (f == NULL) {
@@ -51,7 +52,18 @@ static esp_err_t s_example_read_file(const char *path) {
 }
 
 void sd_task(void *args) { 
+	QueueHandle_t **queues = (QueueHandle_t **)args; 
+	QueueHandle_t *gps_to_sd_queue = queues[0]; 
+
+	gps_data_t *gps_data = malloc(sizeof(gps_data_t)); 
+
+	char data[MAX_CHAR_SIZE];
+	const char *GPS_FILE_PATH = MOUNT_POINT"/gps_data.log"; 
+
     esp_err_t ret;
+	sdmmc_card_t *card;
+	sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+	host.max_freq_khz = SDMMC_FREQ_DEFAULT; // 20 MHz
 
     // Options for mounting the filesystem.
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
@@ -59,57 +71,25 @@ void sd_task(void *args) {
         .max_files = 5,
         .allocation_unit_size = 16 * 1024
     };
-    sdmmc_card_t *card;
-    const char mount_point[] = MOUNT_POINT;
-    ESP_LOGI(SD_TAG, "Initializing SD card");
 
-    // Use settings defined above to initialize SD card and mount FAT filesystem.
-    // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
-    // Please check its source code and implement error recovery when developing
-    // production applications.
 
-    ESP_LOGI(SD_TAG, "Using SDMMC peripheral");
-
-    // By default, SD card frequency is initialized to SDMMC_FREQ_DEFAULT (20MHz)
-    // For setting a specific frequency, use host.max_freq_khz (range 400kHz - 40MHz for SDMMC)
-    // Example: for fixed frequency of 10MHz, use host.max_freq_khz = 10000;
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-#if CONFIG_SDMMC_SPEED_HS
-    host.max_freq_khz = 20000;
-#elif CONFIG_SDMMC_SPEED_UHS_I_SDR50
-    host.slot = SDMMC_HOST_SLOT_0;
-    host.max_freq_khz = 20000;
-    host.flags &= ~SDMMC_HOST_FLAG_DDR;
-#elif CONFIG_SDMMC_SPEED_UHS_I_DDR50
-    host.slot = SDMMC_HOST_SLOT_0;
-    host.max_freq_khz = 20000;
-#endif
-
-    // This initializes the slot without card detect (CD) and write protect (WP) signals.
+	ESP_LOGI(SD_TAG, "Initializing SD card");
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
 #if IS_UHS1
     slot_config.flags |= SDMMC_SLOT_FLAG_UHS1;
 #endif
 
-    // Set bus width to use:
-#ifdef CONFIG_SDMMC_BUS_WIDTH_4
     slot_config.width = 4;
-#else
-    slot_config.width = 1;
-#endif
 	slot_config.clk = CONFIG_CLK_PIN_NUM;
     slot_config.cmd = CONFIG_CMD_PIN_NUM;
     slot_config.d0  = CONFIG_D0_PIN_NUM;
-#ifdef CONFIG_SDMMC_BUS_WIDTH_4
     slot_config.d1 = CONFIG_D1_PIN_NUM;
     slot_config.d2 = CONFIG_D2_PIN_NUM;
     slot_config.d3 = CONFIG_D3_PIN_NUM;
-#endif  // CONFIG_SDMMC_BUS_WIDTH_4
 
 
     ESP_LOGI(SD_TAG, "Mounting filesystem");
-    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
-
+    ret = esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &card);
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
             ESP_LOGE(SD_TAG, "Failed to mount filesystem. ");
@@ -124,57 +104,33 @@ void sd_task(void *args) {
     // Card has been initialized, print its properties
     sdmmc_card_print_info(stdout, card);
 
-    // Use POSIX and C standard library functions to work with files:
+	while (1) { 
+		// GPS data logging 
+		if (xQueueReceive(*gps_to_sd_queue, gps_data, 0)) {
+			snprintf(data, MAX_CHAR_SIZE, "%02d-%02d-%04d %02d:%02d:%02d %f, %f, %fm/s, %.02f degrees, heading %s\n", 
+						gps_data->day, 
+						gps_data->month, 
+						gps_data->year, 
+						gps_data->hour, 
+						gps_data->minute, 
+						gps_data->second, 
+						gps_data->latitude,
+						gps_data->longitude,
+						gps_data->speed,
+						gps_data->cog,
+						gps_data->direction
+						); 
+			ret = append_file(GPS_FILE_PATH, data); 
+			if (ret != ESP_OK) return;
 
-    // First create a file.
-    const char *file_hello = MOUNT_POINT"/hello.txt";
-    char data[MAX_CHAR_SIZE];
-    snprintf(data, MAX_CHAR_SIZE, "%s %s!\n", "Hello", card->cid.name);
-    ret = s_example_write_file(file_hello, data);
-    if (ret != ESP_OK) {
-        return;
-    }
-
-    const char *file_foo = MOUNT_POINT"/foo.txt";
-    // Check if destination file exists before renaming
-    struct stat st;
-    if (stat(file_foo, &st) == 0) {
-        // Delete it if it exists
-        unlink(file_foo);
-    }
-
-    // Rename original file
-    ESP_LOGI(SD_TAG, "Renaming file %s to %s", file_hello, file_foo);
-    if (rename(file_hello, file_foo) != 0) {
-        ESP_LOGE(SD_TAG, "Rename failed");
-        return;
-    }
-
-    ret = s_example_read_file(file_foo);
-    if (ret != ESP_OK) {
-        return;
-    }
-
-    const char *file_nihao = MOUNT_POINT"/nihao.txt";
-    memset(data, 0, MAX_CHAR_SIZE);
-    snprintf(data, MAX_CHAR_SIZE, "%s %s!\n", "Nihao", card->cid.name);
-    ret = s_example_write_file(file_nihao, data);
-    if (ret != ESP_OK) {
-        return;
-    }
-
-    //Open file for reading
-    ret = s_example_read_file(file_nihao);
-    if (ret != ESP_OK) {
-        return;
-    }
-
-    // All done, unmount partition and disable SDMMC peripheral
-    esp_vfs_fat_sdcard_unmount(mount_point, card);
-    ESP_LOGI(SD_TAG, "Card unmounted");
-
-	while(1) { 
-		vTaskDelay(pdMS_TO_TICKS(10000));
-
+			// Open file for reading
+			ret = read_file(GPS_FILE_PATH);
+			if (ret != ESP_OK) return;
+		}
+		vTaskDelay(pdMS_TO_TICKS(200));
 	}
+
+	// Unmount partition and disable SDMMC peripheral
+	esp_vfs_fat_sdcard_unmount(MOUNT_POINT, card);
+	ESP_LOGI(SD_TAG, "Card unmounted");
 }

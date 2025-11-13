@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 /** @brief Maximum character buffer size for file operations */
-#define MAX_CHAR_SIZE    64
+#define MAX_CHAR_SIZE    128
 
 /** @brief Default SD card mount point */
 #define MOUNT_POINT "/sdcard"

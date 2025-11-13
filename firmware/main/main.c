@@ -33,6 +33,8 @@ void app_main(void) {
 	// Done in this manner because we have flexible array members 
 	i2c_task_args_t *accel_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 1*sizeof(QueueHandle_t*)); 
 	i2c_task_args_t *display_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 2*sizeof(QueueHandle_t*)); 
+	QueueHandle_t *gps_args[2] = {&gps_to_display_queue, &gps_to_sd_queue}; 
+	QueueHandle_t *sd_args[1] = {&gps_to_sd_queue}; 
 
 	// Populating task arguments
 	// To sent to accelerometer task 
@@ -47,9 +49,9 @@ void app_main(void) {
 	// Create tasks 
 	ESP_LOGI(MAIN_TAG, "Creating tasks");
 	xTaskCreate(accelerometer_task, ACCEL_TAG, 2500, accel_args, 4, NULL); 
-	xTaskCreate(gps_task, GPS_TAG, 4500, gps_to_display_queue, 4, NULL);
+	xTaskCreate(gps_task, GPS_TAG, 4500, gps_args, 4, NULL);
     xTaskCreate(display_task, DISPLAY_TAG, 4096, display_args, 4, NULL);
-    xTaskCreate(sd_task, SD_TAG, 4096, NULL, 4, NULL);
+    xTaskCreate(sd_task, SD_TAG, 4096, sd_args, 4, NULL);
 
 	while(1){ 
 		vTaskDelay(pdMS_TO_TICKS(10000));

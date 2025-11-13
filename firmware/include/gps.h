@@ -20,7 +20,7 @@ extern "C" {
 #define BAUD_RATE 9600
 #define QUEUE_SIZE 16
 #define RMC_SIZE 13
-#define TIME_ZONE -4
+#define TIME_ZONE -5
 #define RX_BUFFER_SIZE 1024
 
 // -----------------------------------------------------------------------------
