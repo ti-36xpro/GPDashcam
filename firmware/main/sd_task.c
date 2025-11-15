@@ -15,6 +15,7 @@
 #include "sd_test_io.h"
 #include "sd.h"
 #include "gps.h"
+#include "esp_camera.h"
 
 static esp_err_t append_file(const char *path, char *data) {
     ESP_LOGI(SD_TAG, "Opening file %s", path);
@@ -54,11 +55,14 @@ static esp_err_t read_file(const char *path) {
 void sd_task(void *args) { 
 	QueueHandle_t **queues = (QueueHandle_t **)args; 
 	QueueHandle_t *gps_to_sd_queue = queues[0]; 
+	QueueHandle_t *camera_to_sd_queue = queues[1]; 
 
 	gps_data_t *gps_data = malloc(sizeof(gps_data_t)); 
+	camera_fb_t *camera_fb = malloc(sizeof(camera_fb_t)); 
 
 	char data[MAX_CHAR_SIZE];
 	const char *GPS_FILE_PATH = MOUNT_POINT"/gps_data.log"; 
+	const char *CAMERA_FILE_PATH = MOUNT_POINT"/image.jpg"; 
 
     esp_err_t ret;
 	sdmmc_card_t *card;
@@ -126,6 +130,13 @@ void sd_task(void *args) {
 			// Open file for reading
 			ret = read_file(GPS_FILE_PATH);
 			if (ret != ESP_OK) return;
+		}
+
+		if (xQueueReceive(*camera_to_sd_queue, camera_fb, 1000)) {
+			FILE *file = fopen(CAMERA_FILE_PATH, "w"); 
+			fwrite(camera_fb->buf, 1, camera_fb->len, file); 
+			fclose(file); 
+			ESP_LOGI(SD_TAG, "Image saved to %s", CAMERA_FILE_PATH); 
 		}
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}

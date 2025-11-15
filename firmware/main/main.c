@@ -6,6 +6,8 @@
 #include "display.h"
 #include "sd.h"
 #include "i2c_common.h"
+#include "camera.h"
+#include "esp_camera.h"
 
 #define MAIN_TAG "MAIN_TASK"
 
@@ -28,13 +30,15 @@ void app_main(void) {
 	QueueHandle_t accel_to_display_queue = xQueueCreate(1, sizeof(accel_data_t)); 
 	QueueHandle_t gps_to_display_queue = xQueueCreate(1, sizeof(gps_data_t)); 
 	QueueHandle_t gps_to_sd_queue = xQueueCreate(1, sizeof(gps_data_t)); 
+	QueueHandle_t camera_to_sd_queue = xQueueCreate(1, sizeof(camera_fb_t)); 
 
 	// Instantiate args struct pointers 
 	// Done in this manner because we have flexible array members 
 	i2c_task_args_t *accel_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 1*sizeof(QueueHandle_t*)); 
 	i2c_task_args_t *display_args = (i2c_task_args_t*)malloc(sizeof(i2c_task_args_t*) + 2*sizeof(QueueHandle_t*)); 
 	QueueHandle_t *gps_args[2] = {&gps_to_display_queue, &gps_to_sd_queue}; 
-	QueueHandle_t *sd_args[1] = {&gps_to_sd_queue}; 
+	QueueHandle_t *sd_args[2] = {&gps_to_sd_queue, &camera_to_sd_queue}; 
+	QueueHandle_t *camera_args[1] = {&camera_to_sd_queue}; 
 
 	// Populating task arguments
 	// To sent to accelerometer task 
@@ -52,6 +56,7 @@ void app_main(void) {
 	xTaskCreate(gps_task, GPS_TAG, 4500, gps_args, 4, NULL);
     xTaskCreate(display_task, DISPLAY_TAG, 4096, display_args, 4, NULL);
     xTaskCreate(sd_task, SD_TAG, 4096, sd_args, 4, NULL);
+	xTaskCreate(camera_task, CAMERA_TAG, 4096, camera_args, 5, NULL); 
 
 	while(1){ 
 		vTaskDelay(pdMS_TO_TICKS(10000));
