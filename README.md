@@ -1,9 +1,9 @@
 ![](docs/demo/display_refresh_rate.gif)
 
-![](docs/demo/1.jpg)
+![1](docs/demo/1.jpg)
 
-![](docs/demo/2.jpg)
+![2](docs/demo/2.jpg)
 
-![](docs/demo/3.jpg)
+![3](docs/demo/3.jpg)
 
-![](docs/demo/4.jpg)
+![4](docs/demo/4.jpg)
